@@ -8,18 +8,18 @@ const btn_decrypt = document.querySelector('.action-btn-decrypt');
 const btn_clear = document.querySelector('.action-btn-clear');
 
 
-btn_read_from_file.addEventListener('click', () => {
+btn_read_from_file?.addEventListener('click', () => {
     console.log('btn_read_from_file clicked');
 });
 
-btn_encrypt.addEventListener('click', () => {
+btn_encrypt?.addEventListener('click', () => {
     console.log('btn_encrypt clicked');
 });
 
-btn_decrypt.addEventListener('click', () => {
+btn_decrypt?.addEventListener('click', () => {
     console.log('btn_decrypt clicked');
 });
 
-btn_clear.addEventListener('click', () => {
+btn_clear?.addEventListener('click', () => {
     console.log('btn_clear clicked');
-});
+}); 
