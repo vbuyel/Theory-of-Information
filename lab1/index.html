@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Алгоритм Виженера</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="cipher-card">
+    <div class="cipher-title">Алгоритм Виженера, прогрессивный ключ</div>
+
+    <div class="form-row">
+      <div class="label">Ключ</div>
+      <input class="input-text" id="user_key" type="text" placeholder="Введите ключ" />
+      <button class="btn-read-from-file" type="button">Прочитать из файла</button>
+    </div>
+
+    <div class="field-label">Исходный текст:</div>
+    <input
+      class="full-input"
+      id="original_text"
+      type="text"
+      placeholder="Введите текст"
+    />
+
+    <div class="field-label">Результирующий текст:</div>
+    <input
+      class="full-input"
+      id="encrypted_text"
+      type="text"
+      placeholder="Введите текст"
+    />
+
+    <div class="actions">
+      <button class="action-btn-encrypt" type="button">ШИФРОВАТЬ</button>
+      <button class="action-btn-decrypt" type="button">ДЕШИФРОВАТЬ</button>
+      <button class="action-btn-clear" type="button">ОЧИСТИТЬ</button>
+    </div>
+  </div>
+  <script src="main.js"></script>
+</body>
+</html>
