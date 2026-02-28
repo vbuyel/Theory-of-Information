@@ -107,8 +107,19 @@ body {
     cursor: pointer;
 }
 
+.material-symbols-outlined {
+    padding: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 2px;
+    border: 1px solid #555;
+    background: #f9f0f2;
+    cursor: pointer;
+}
+
 .action-btn-encrypt:hover,
 .action-btn-decrypt:hover,
-.action-btn-clear:hover {
+.action-btn-clear:hover,
+.material-symbols-outlined:hover {
     background: #f0e0e3;
 }

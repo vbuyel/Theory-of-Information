@@ -12,6 +12,7 @@ const btn_read_from_file = document.querySelector('.btn-read-from-file');
 const btn_encrypt = document.querySelector('.action-btn-encrypt');
 const btn_decrypt = document.querySelector('.action-btn-decrypt');
 const btn_clear = document.querySelector('.action-btn-clear');
+const btn_save = document.getElementById('btn_save');
 
 
 cipher_titles.forEach((title) => {
@@ -76,12 +77,7 @@ file_input?.addEventListener('change', () => {
 
     const reader = new FileReader();
     reader.onload = () => {
-        let text = reader.result ?? '';
-        const lines = text.split('\n');
-
-        user_key.value = lines[0] ?? '';
-        original_text.value = lines[1] ?? '';
-
+        original_text.value = reader.result ?? '';
         error_messages.textContent = '';
         error_messages.classList.remove('active');
     };
@@ -135,4 +131,22 @@ btn_clear?.addEventListener('click', () => {
     user_key.value = "";
     original_text.value = "";
     processed_text.value = "";
+});
+
+btn_save?.addEventListener('click', () => {
+    const text = processed_text.value;
+    if (!text.trim()) {
+        error_messages.textContent = 'Нет текста для сохранения';
+        error_messages.classList.add('active');
+        return;
+    }
+    error_messages.textContent = '';
+    error_messages.classList.remove('active');
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'processed_text.txt';
+    a.click();
+    URL.revokeObjectURL(url);
 });
