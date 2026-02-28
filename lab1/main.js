@@ -1,12 +1,17 @@
+import { vigenere_ru } from './ciphers/vigenereCipher.js';
+import { playfair_en } from './ciphers/playfairCipher.js';
+
 const cipher_titles = document.querySelectorAll('.cipher-title');
 const user_key = document.getElementById('user_key');
 const original_text = document.getElementById('original_text');
-const encrypted_text = document.getElementById('encrypted_text');
+const processed_text = document.getElementById('processed_text');
+const error_messages = document.querySelector('.error-messages')
 
 const btn_read_from_file = document.querySelector('.btn-read-from-file');
 const btn_encrypt = document.querySelector('.action-btn-encrypt');
 const btn_decrypt = document.querySelector('.action-btn-decrypt');
 const btn_clear = document.querySelector('.action-btn-clear');
+
 
 cipher_titles.forEach((title) => {
     title.addEventListener('click', () => {
@@ -15,18 +20,93 @@ cipher_titles.forEach((title) => {
     });
 });
 
+const check_on_alphabet = (text, abc) => {
+    if (abc === "ru") {
+        if (/[^А-ЯЁ]/i.test(text)) {
+            if (!error_messages.classList.contains('active')) {
+                error_messages.classList.add('active');
+            }
+            error_messages.textContent = "Предупреждение: можете потерять символы. Требуется русский алфавит"
+        }
+        return text.replace(/[^А-ЯЁ]/gi, '');
+    } else {
+        if (/[^A-Z]/i.test(text)) {
+            if (!error_messages.classList.contains('active')) {
+                error_messages.classList.add('active');
+            }
+            error_messages.textContent = "Предупреждение: можете потерять символы. Требуется английский алфавит"
+        }
+        return text.replace(/[^A-Z]/gi, '');
+    }
+}
+
+const get_choosed_method = () => {
+    let selected_id = null;
+    try {
+        cipher_titles.forEach(title => {
+            if (title.classList.contains('active')) {
+                selected_id = title.id;
+            }
+        })
+        return selected_id;
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+const choose_methods = [
+    vigenere_ru,
+    playfair_en
+];
+
 btn_read_from_file?.addEventListener('click', () => {
     console.log('btn_read_from_file clicked');
 });
 
 btn_encrypt?.addEventListener('click', () => {
-    console.log('btn_encrypt clicked');
+    const method_id = get_choosed_method();
+
+    let key = user_key.value;
+    let inputed_text = original_text.value;
+    error_messages.textContent = "";
+    error_messages.classList.remove('active');
+
+    if (method_id === "0") {
+        key = check_on_alphabet(key, "ru");
+        inputed_text = check_on_alphabet(inputed_text, "ru");
+    } else {
+        key = check_on_alphabet(key, "eng");
+        inputed_text = check_on_alphabet(inputed_text, "eng");
+    }
+
+    const encrypted_text = choose_methods[method_id](inputed_text, key, false);
+    processed_text.value = encrypted_text;
 });
 
 btn_decrypt?.addEventListener('click', () => {
-    console.log('btn_decrypt clicked');
+    const method_id = get_choosed_method();
+
+    let key = user_key.value;
+    let inputed_text = original_text.value;
+    error_messages.textContent = "";
+    error_messages.classList.remove('active');
+
+    if (method_id === "0") {
+        key = check_on_alphabet(key, "ru");
+        inputed_text = check_on_alphabet(inputed_text, "ru");
+    } else {
+        key = check_on_alphabet(key, "eng");
+        inputed_text = check_on_alphabet(inputed_text, "eng");
+    }
+
+    const decrypted_text = choose_methods[method_id](inputed_text, key, true);
+    processed_text.value = decrypted_text;
 });
 
 btn_clear?.addEventListener('click', () => {
-    console.log('btn_clear clicked');
-}); 
+    error_messages.textContent = "";
+    error_messages.classList.remove('active');
+    user_key.value = "";
+    original_text.value = "";
+    processed_text.value = "";
+});

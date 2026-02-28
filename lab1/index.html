@@ -7,8 +7,8 @@
 </head>
 <body>
   <div class="cipher-card">
-    <div class="cipher-title active" id="1">Алгоритм Виженера, прогрессивный ключ (русский язык)</div>
-    <div class="cipher-title" id="2">Шифр Плейфейра (английский язык)</div>
+    <div class="cipher-title active" id="0">Алгоритм Виженера, прогрессивный ключ (русский язык)</div>
+    <div class="cipher-title" id="1">Шифр Плейфейра (английский язык)</div>
 
     <div class="form-row">
       <div class="label">Ключ</div>
@@ -27,9 +27,9 @@
     <div class="field-label">Результирующий текст:</div>
     <input
       class="full-input"
-      id="encrypted_text"
+      id="processed_text"
       type="text"
-      placeholder="Введите текст"
+      placeholder="Здесь будет результат операций"
     />
 
     <div class="actions">
@@ -37,7 +37,13 @@
       <button class="action-btn-decrypt" type="button">ДЕШИФРОВАТЬ</button>
       <button class="action-btn-clear" type="button">ОЧИСТИТЬ</button>
     </div>
+
+    <div class="error-messages">
+      <div></div>
+      <!-- <div class="key"></div>
+      <div class="user-input"></div> -->
+    </div>
   </div>
-  <script src="main.js"></script>
+  <script type="module" src="main.js"></script>
 </body>
 </html>

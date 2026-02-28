@@ -79,6 +79,14 @@ body {
     font-size: 14px;
 }
 
+.cipher-card .error-messages.active {
+    margin-top: 20px;
+    padding: 4px;
+    border-radius: 4px;
+    border: 1px solid #d25869;
+    background: #e7a9b2;
+}
+
 .actions {
     margin-top: 16px;
     display: flex;
