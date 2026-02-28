@@ -7,6 +7,7 @@ const original_text = document.getElementById('original_text');
 const processed_text = document.getElementById('processed_text');
 const error_messages = document.querySelector('.error-messages')
 
+const file_input = document.getElementById('file_input');
 const btn_read_from_file = document.querySelector('.btn-read-from-file');
 const btn_encrypt = document.querySelector('.action-btn-encrypt');
 const btn_decrypt = document.querySelector('.action-btn-decrypt');
@@ -23,18 +24,18 @@ cipher_titles.forEach((title) => {
 const check_on_alphabet = (text, abc) => {
     if (abc === "ru") {
         if (/[^А-ЯЁ]/i.test(text)) {
+            error_messages.textContent = "Предупреждение: можете потерять символы. Требуется русский алфавит"
             if (!error_messages.classList.contains('active')) {
                 error_messages.classList.add('active');
             }
-            error_messages.textContent = "Предупреждение: можете потерять символы. Требуется русский алфавит"
         }
         return text.replace(/[^А-ЯЁ]/gi, '');
     } else {
         if (/[^A-Z]/i.test(text)) {
+            error_messages.textContent = "Предупреждение: можете потерять символы. Требуется английский алфавит"
             if (!error_messages.classList.contains('active')) {
                 error_messages.classList.add('active');
             }
-            error_messages.textContent = "Предупреждение: можете потерять символы. Требуется английский алфавит"
         }
         return text.replace(/[^A-Z]/gi, '');
     }
@@ -60,7 +61,32 @@ const choose_methods = [
 ];
 
 btn_read_from_file?.addEventListener('click', () => {
-    console.log('btn_read_from_file clicked');
+    file_input?.click();
+});
+
+file_input?.addEventListener('change', () => {
+    const file = file_input.files?.[0];
+
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.txt')) {
+        error_messages.textContent = 'Выберите файл с расширением .txt';
+        error_messages.classList.add('active');
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+        let text = reader.result ?? '';
+        const lines = text.split('\n');
+
+        user_key.value = lines[0] ?? '';
+        original_text.value = lines[1] ?? '';
+
+        error_messages.textContent = '';
+        error_messages.classList.remove('active');
+    };
+    reader.readAsText(file, 'UTF-8');
+    file_input.value = '';
 });
 
 btn_encrypt?.addEventListener('click', () => {

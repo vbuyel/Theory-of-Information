@@ -8,11 +8,12 @@
 <body>
   <div class="cipher-card">
     <div class="cipher-title active" id="0">Алгоритм Виженера, прогрессивный ключ (русский язык)</div>
-    <div class="cipher-title" id="1">Шифр Плейфейра (английский язык)</div>
+    <div class="cipher-title" id="1">Шифр Плейфера (английский язык)</div>
 
     <div class="form-row">
       <div class="label">Ключ</div>
       <input class="input-text" id="user_key" type="text" placeholder="Введите ключ" />
+      <input type="file" id="file_input" accept=".txt" hidden />
       <button class="btn-read-from-file" type="button">Прочитать из файла</button>
     </div>
 
@@ -30,6 +31,7 @@
       id="processed_text"
       type="text"
       placeholder="Здесь будет результат операций"
+      readonly
     />
 
     <div class="actions">
@@ -40,8 +42,6 @@
 
     <div class="error-messages">
       <div></div>
-      <!-- <div class="key"></div>
-      <div class="user-input"></div> -->
     </div>
   </div>
   <script type="module" src="main.js"></script>
