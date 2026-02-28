@@ -24,6 +24,18 @@ body {
     margin-bottom: 16px;
 }
 
+.cipher-title.active {
+    padding: 4px;
+    border-radius: 4px;
+    border: 1px solid #c69198;
+    background: #e9b8bf;
+}
+
+.cipher-title:hover {
+    cursor: pointer;
+    color: #5f3a41;
+}
+
 .form-row {
     display: flex;
     align-items: center;
