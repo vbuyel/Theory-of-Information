@@ -169,7 +169,7 @@ btn_save.addEventListener('click', () => {
     hide_error();
 
     // Формируем имя выходного файла
-    const output_name = 'result_' + (loaded_file_name || 'output.bin');
+    const output_name = 'result_' + (loaded_file_name?.split(".")[0] || 'output.bin');
 
     // Сохраняем как поток байтов
     const blob = new Blob([last_result_bytes], { type: 'application/octet-stream' });
