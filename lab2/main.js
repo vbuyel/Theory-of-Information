@@ -21,6 +21,7 @@ const result_output = document.getElementById('result_output');
 let loaded_file_bytes = null;
 let loaded_file_name = '';
 let last_result_bytes = null;
+let is_decoded = false;
 
 
 // ===== Утилиты =====
@@ -141,8 +142,14 @@ function process_file() {
     output_section.style.display = 'block';
 }
 
-btn_encrypt.addEventListener('click', process_file);
-btn_decrypt.addEventListener('click', process_file);
+btn_encrypt.addEventListener('click', () => {
+    is_decoded = false;
+    process_file
+});
+btn_decrypt.addEventListener('click', () => {
+    is_decoded = true;
+    process_file
+});
 
 
 // ===== Очистить =====
@@ -170,6 +177,7 @@ btn_save.addEventListener('click', () => {
 
     // Формируем имя выходного файла
     const output_name = 'result_' + (loaded_file_name?.split(".")[0] || 'output.bin');
+    if (is_decoded) { output_name += loaded_file_name?.split(".")[1] }
 
     // Сохраняем как поток байтов
     const blob = new Blob([last_result_bytes], { type: 'application/octet-stream' });
