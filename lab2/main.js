@@ -178,7 +178,7 @@ btn_save.addEventListener('click', () => {
     hide_error();
 
     // Формируем имя выходного файла
-    const output_name = 'result_' + (loaded_file_name?.split(".")[0] || 'output');
+    let output_name = 'result_' + (loaded_file_name?.split(".")[0] || 'output');
     if (is_decrypted) { output_name += "." + prev_extantion; }
 
     // Сохраняем как поток байтов
