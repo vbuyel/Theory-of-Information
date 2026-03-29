@@ -1,0 +1,153 @@
+body {
+    margin: 0;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f4f4f4;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.cipher-card {
+    width: 560px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-sizing: border-box;
+    padding: 24px 28px;
+    background: #f7c3c8;
+    border: 1px solid #c69198;
+    border-radius: 4px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+.cipher-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    padding: 4px;
+    border-radius: 4px;
+    border: 1px solid #c69198;
+    background: #e9b8bf;
+}
+
+.form-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.label {
+    min-width: 110px;
+    font-size: 14px;
+}
+
+.input-text {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 4px 6px;
+    border-radius: 2px;
+    border: 1px solid #999;
+    font-size: 14px;
+    font-family: monospace;
+    letter-spacing: 2px;
+    background: #ffffff;
+}
+
+.btn-read-from-file {
+    padding: 5px 10px;
+    font-size: 13px;
+    border-radius: 2px;
+    border: 1px solid #555;
+    background: #f4f4f4;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.btn-read-from-file:hover {
+    background: #e6e6e6;
+}
+
+.file-name {
+    font-size: 13px;
+    color: #666;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 200px;
+}
+
+.field-label {
+    margin-top: 12px;
+    margin-bottom: 4px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.cipher-card .error-messages.active {
+    margin-top: 16px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid #d25869;
+    background: #e7a9b2;
+    font-size: 14px;
+}
+
+.actions {
+    margin-top: 16px;
+    display: flex;
+    gap: 8px;
+    justify-content: space-between;
+}
+
+.action-btn-encrypt,
+.action-btn-decrypt,
+.action-btn-clear {
+    flex: 1;
+    padding: 6px 0;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 2px;
+    border: 1px solid #555;
+    background: #f9f0f2;
+    cursor: pointer;
+}
+
+.material-symbols-outlined {
+    padding: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 2px;
+    border: 1px solid #555;
+    background: #f9f0f2;
+    cursor: pointer;
+}
+
+.action-btn-encrypt:hover,
+.action-btn-decrypt:hover,
+.action-btn-clear:hover,
+.material-symbols-outlined:hover {
+    background: #f0e0e3;
+}
+
+.output-section {
+    margin-top: 16px;
+    border-top: 1px solid #c69198;
+    padding-top: 8px;
+}
+
+.binary-output {
+    width: 100%;
+    max-height: 120px;
+    overflow-y: auto;
+    padding: 6px 8px;
+    box-sizing: border-box;
+    background: #fff;
+    border: 1px solid #999;
+    border-radius: 2px;
+    font-family: monospace;
+    font-size: 12px;
+    word-break: break-all;
+    line-height: 1.4;
+    white-space: pre-wrap;
+}

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Lab2 Buyel — LFSR потоковое шифрование</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&icon_names=save" />
+</head>
+<body>
+  <div class="cipher-card">
+    <div class="cipher-title">Потоковое шифрование LFSR (регистр 25 бит)</div>
+
+    <!-- Ввод начального состояния регистра -->
+    <div class="form-row">
+      <div class="label">Регистр (25 бит)</div>
+      <input
+        class="input-text"
+        id="register_input"
+        type="text"
+        maxlength="25"
+        placeholder="Введите 25 бит, например: 1010110011101001011010011"
+      />
+    </div>
+
+    <!-- Загрузка файла -->
+    <div class="form-row">
+      <div class="label">Файл</div>
+      <input type="file" id="file_input" hidden />
+      <button class="btn-read-from-file" id="btn_choose_file" type="button">Выбрать файл</button>
+      <span class="file-name" id="file_name">файл не выбран</span>
+    </div>
+
+    <!-- Кнопки -->
+    <div class="actions">
+      <button class="action-btn-encrypt" type="button">ШИФРОВАТЬ</button>
+      <button class="action-btn-decrypt" type="button">ДЕШИФРОВАТЬ</button>
+      <button class="action-btn-clear" type="button">ОЧИСТИТЬ</button>
+      <button class="material-symbols-outlined" type="button" id="btn_save" title="Сохранить результат">save</button>
+    </div>
+
+    <!-- Сообщения об ошибках -->
+    <div class="error-messages">
+      <div></div>
+    </div>
+
+    <!-- Области вывода двоичных данных -->
+    <div class="output-section" id="output_section" style="display:none;">
+      <div class="field-label">Сгенерированный ключ (биты):</div>
+      <div class="binary-output" id="key_output"></div>
+
+      <div class="field-label">Исходный файл (биты):</div>
+      <div class="binary-output" id="source_output"></div>
+
+      <div class="field-label">Результат (биты):</div>
+      <div class="binary-output" id="result_output"></div>
+    </div>
+  </div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
