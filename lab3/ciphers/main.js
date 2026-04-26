@@ -27,6 +27,7 @@ import {
 // ===== Состояние приложения =====
 let currentFileData = null;   // Uint8Array — байты загруженного файла
 let currentFileName = '';     // имя файла
+let currentFileDecimal = '';  // строковое представление файла в decimal
 let lastCipherData = null;   // Uint8Array — результат шифрования
 let lastPlainData = null;   // Uint8Array — результат дешифрования
 let operationMode = null;   // 'encrypt' | 'decrypt' | null
@@ -61,7 +62,11 @@ function clearError() {
 /**
  * Показать текст в секции вывода.
  */
-function showOutput(text) {
+function showSource(text) {
+    if (els.sourceOutput) els.sourceOutput.textContent = text;
+}
+
+function showResult(text) {
     if (els.resultOutput) els.resultOutput.textContent = text;
     if (els.outputSection) els.outputSection.style.display = 'block';
 }
@@ -70,6 +75,7 @@ function showOutput(text) {
  * Скрыть секцию вывода.
  */
 function hideOutput() {
+    if (els.sourceOutput) els.sourceOutput.textContent = '';
     if (els.resultOutput) els.resultOutput.textContent = '';
     if (els.outputSection) els.outputSection.style.display = 'none';
 }
@@ -125,6 +131,12 @@ async function handleFileSelect() {
 
     try {
         currentFileData = await readFileAsArrayBuffer(file);
+        // Конвертируем байты в decimal строку (первые 200 байт)
+        const limit = Math.min(currentFileData.length, 200);
+        currentFileDecimal = Array.from(currentFileData).slice(0, limit).join(' ');
+        if (currentFileData.length > 200) {
+            currentFileDecimal += ' …';
+        }
         clearError();
     } catch (err) {
         showError(err.message);
@@ -155,9 +167,12 @@ function encryptFile() {
         lastPlainData = null;
         operationMode = 'encrypt';
 
+        // Выводим исходный файл и результат
+        showSource(currentFileDecimal);
+
         // Выводим блоки шифротекста как десятичные числа
         const decStr = cipherToDecimalString(cipherBytes, n);
-        showOutput(decStr);
+        showResult(decStr);
     } catch (err) {
         showError('Ошибка шифрования: ' + err.message);
     }
@@ -202,9 +217,13 @@ function decryptFile() {
         lastCipherData = null;
         operationMode = 'decrypt';
 
+        // Показываем исходный шифротекст и результат
+        const sourceText = els.resultOutput?.textContent?.trim() || '';
+        showSource(sourceText);
+
         // Показываем превью (первые 200 байт как десятичные числа)
         const preview = Array.from(plainBytes).slice(0, 200).join(' ');
-        showOutput(preview + (plainBytes.length > 200 ? ' …' : ''));
+        showResult(preview + (plainBytes.length > 200 ? ' …' : ''));
     } catch (err) {
         showError('Ошибка дешифрования: ' + err.message);
     }
@@ -237,6 +256,7 @@ function clearAll() {
 
     currentFileData = null;
     currentFileName = '';
+    currentFileDecimal = '';
     lastCipherData = null;
     lastPlainData = null;
     operationMode = null;
@@ -256,6 +276,7 @@ function init() {
         fileInput: document.getElementById('file_input'),
         btnChooseFile: document.getElementById('btn_choose_file'),
         fileName: document.getElementById('file_name'),
+        sourceOutput: document.getElementById('source_output'),
         resultOutput: document.getElementById('result_output'),
         outputSection: document.getElementById('output_section'),
         btnSave: document.getElementById('btn_save'),
