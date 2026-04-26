@@ -1,233 +1,334 @@
 /**
- * Вычисляет a по модулю n, гарантируя неотрицательный результат.
- * @param {bigint} a - Делимое.
- * @param {bigint} n - Делитель (должен быть положительным).
- * @returns {bigint} Остаток в диапазоне [0, n-1].
+ * rabin.js — Rabin Cryptosystem: encryption / decryption
+ *
+ * Encryption formula:
+ *   C = m * (m + b) mod n
+ *
+ * Padding strategy — 2-byte marker (0xFF 0xFF)
+ *   Before encrypting each block, two bytes 0xFF 0xFF are appended.
+ *   After decryption, the correct root (out of 4 CRT candidates) is
+ *   identified as the one whose trailing 2 bytes equal the marker.
+ *
+ * Block layout
+ *   n = p * q determines maximum block value.
+ *   blockSize  = byte-length of (n − 1), minus 2 bytes reserved for the marker.
+ *   Each plaintext chunk of `blockSize` bytes is concatenated with 0xFF 0xFF,
+ *   converted to a BigInt, encrypted, and stored as a fixed-width BigInt
+ *   occupying `cipherBlockSize` bytes (byte-length of n).
  */
-export function mod(a, n) {
-  const r = a % n;
-  return r >= 0n ? r : r + n;
-}
+
+import { mod, gcdExtended, power, isPrime } from './math.js';
+
+
+/* ------------------------------------------------------------------ */
+/*  Marker constants                                                   */
+/* ------------------------------------------------------------------ */
+const MARKER = new Uint8Array([0xFF, 0xFF]);
+const MARKER_LEN = MARKER.length;            // 2
+
+
+/* ------------------------------------------------------------------ */
+/*  Helpers: BigInt ↔ byte-array conversions (big-endian)              */
+/* ------------------------------------------------------------------ */
+
 
 /**
- * Расширенный алгоритм Евклида.
- * Находит целые числа x, y такие, что a*x + b*y = gcd(a, b).
- * @param {bigint} a - Первое число.
- * @param {bigint} b - Второе число.
- * @returns {{ x: bigint, y: bigint, d: bigint }} Коэффициенты и НОД.
+ * Return how many bytes are needed to represent value (≥ 1).
+ * @param {bigint} value
+ * @returns {number}
  */
-export function euclidEx(a, b) {
-  let remainderOld = a;
-  let remainderNew = b;
-  let coeffXOld = 1n;
-  let coeffXNew = 0n;
-  let coeffYOld = 0n;
-  let coeffYNew = 1n;
-
-  while (remainderNew !== 0n) {
-    const quotient = remainderOld / remainderNew;
-    const remainderTemp = remainderOld % remainderNew;
-    const coeffXTemp = coeffXOld - quotient * coeffXNew;
-    const coeffYTemp = coeffYOld - quotient * coeffYNew;
-
-    remainderOld = remainderNew;
-    remainderNew = remainderTemp;
-    coeffXOld = coeffXNew;
-    coeffXNew = coeffXTemp;
-    coeffYOld = coeffYNew;
-    coeffYNew = coeffYTemp;
-  }
-
-  return { x: coeffXOld, y: coeffYOld, d: remainderOld };
+function byteLength(value) {
+    if (value <= 0n) return 1;
+    let len = 0;
+    let v = value;
+    while (v > 0n) { v >>= 8n; len++; }
+    return len;
 }
 
-/**
- * Быстрое модульное возведение в степень методом "квадрат и умножение".
- * Вычисляет (a^z) mod n эффективно.
- * @param {bigint} a - Основание.
- * @param {bigint} z - Показатель степени (неотрицательный).
- * @param {bigint} n - Модуль (положительный).
- * @returns {bigint} (a^z) mod n.
- */
-export function fastExp(a, z, n) {
-  let base = mod(a, n);
-  let exponent = z;
-  let result = 1n;
 
-  while (exponent !== 0n) {
-    // Пока показатель чётный, возводим в квадрат и делим пополам
-    while (exponent % 2n === 0n) {
-      exponent /= 2n;
-      base = mod(base * base, n);
+/**
+ * BigInt → Uint8Array (big-endian), zero-padded to `len` bytes.
+ */
+function bigintToBytes(value, len) {
+    const bytes = new Uint8Array(len);
+    let v = value;
+    for (let i = len - 1; i >= 0; i--) {
+        bytes[i] = Number(v & 0xFFn);
+        v >>= 8n;
     }
-    exponent -= 1n;
-    result = mod(result * base, n);
-  }
-
-  return result;
+    return bytes;
 }
 
+
 /**
- * Проверка числа на простоту методом пробного деления.
- * Подходит для small to medium-sized чисел, используемых в этой лабораторной.
- * @param {bigint} n - Число для проверки.
- * @returns {boolean} True, если n простое, иначе false.
+ * Uint8Array (big-endian) → BigInt.
  */
-export function isPrime(n) {
-  if (n < 2n) return false;
-  if (n === 2n || n === 3n) return true;
-  if (n % 2n === 0n) return false;
-  // Проверяем нечётные делители до sqrt(n)
-  for (let i = 3n; i * i <= n; i += 2n) {
-    if (n % i === 0n) return false;
-  }
-  return true;
+function bytesToBigint(bytes) {
+    let result = 0n;
+    for (let i = 0; i < bytes.length; i++) {
+        result = (result << 8n) | BigInt(bytes[i]);
+    }
+    return result;
 }
 
-/**
- * Избыточность: дублируем байт чтобы шифротексты имели совпадающие старший/младший байты.
- * m' = m * 256 + m, поэтому при расшифровке проверяем (m' >> 8) == (m' & 255).
- * @constant {bigint}
- */
-const REDUNDANCY_MULTIPLIER = 257n; // 256 + 1
+
+/* ------------------------------------------------------------------ */
+/*  Parameter validation                                               */
+/* ------------------------------------------------------------------ */
+
 
 /**
- * Проверяет параметры криптосистемы Рабина.
- * Требования: p и q должны быть разными простыми числами ≡ 3 (mod 4),
- * n = p*q должен быть > 256 (для шифрования байтов), и 0 < b < n.
- * @param {bigint} p - Первый простой параметр.
- * @param {bigint} q - Второй простой параметр.
- * @param {bigint} b - Дополнительный параметр.
- * @returns {bigint} Модуль n = p * q.
- * @throws {Error} Если параметры некорректны.
+ * Validate Rabin parameters p, q, b.
+ *
+ * Checks:
+ *   - p and q are prime
+ *   - p ≡ 3 (mod 4) and q ≡ 3 (mod 4)
+ *   - p ≠ q
+ *   - 0 < b < n
+ *
+ * @param {bigint} p
+ * @param {bigint} q
+ * @param {bigint} b
+ * @returns {{ valid: boolean, error?: string, n?: bigint }}
  */
 export function validateParams(p, q, b) {
-  if (!isPrime(p) || !isPrime(q)) {
-    throw new Error("p и q должны быть простыми числами.");
-  }
-  if (p === q) {
-    throw new Error("p и q должны быть разными простыми числами.");
-  }
-  if (p % 4n !== 3n || q % 4n !== 3n) {
-    throw new Error("Должно выполняться p ≡ q ≡ 3 (mod 4).");
-  }
-  const n = p * q;
-  if (n <= 256n) {
-    throw new Error("Требуется n = p*q > 256 для шифрования байтов.");
-  }
-  if (b <= 0n || b >= n) {
-    throw new Error("Требуется 0 < b < n.");
-  }
-  return n;
+    if (!isPrime(p)) return { valid: false, error: 'p не является простым числом' };
+    if (!isPrime(q)) return { valid: false, error: 'q не является простым числом' };
+    if (p % 4n !== 3n) return { valid: false, error: 'p должно быть ≡ 3 (mod 4)' };
+    if (q % 4n !== 3n) return { valid: false, error: 'q должно быть ≡ 3 (mod 4)' };
+    if (p === q) return { valid: false, error: 'p и q должны быть различными' };
+
+    const n = p * q;
+
+    // n must be large enough so that (1 data byte ‖ 0xFF 0xFF) as BigInt < n
+    // worst case: 0xFF 0xFF 0xFF = 16 777 215, so n must be > 16 777 215
+    const MIN_N = (1n << 24n);  // 16 777 216
+    if (n < MIN_N) return { valid: false, error: `n = p·q слишком мало (нужно n ≥ ${MIN_N}, сейчас n = ${n})` };
+    if (b <= 0n || b >= n) return { valid: false, error: 'b должно быть в диапазоне 0 < b < n' };
+
+    return { valid: true, n };
 }
 
-/**
- * Шифрует массив байтов с помощью криптосистемы Рабина.
- * Для каждого байта m вычисляет m' = m * 257 (дублирование для избыточности),
- * затем c = m' * (m' + b) mod n.
- * @param {Uint8Array} bytes - Байты для шифрования.
- * @param {bigint} n - Модуль (p * q).
- * @param {bigint} b - Параметр шифрования.
- * @returns {bigint[]} Массив зашифрованных значений.
- */
-export function encryptBytes(bytes, n, b) {
-  const encrypted = [];
-  for (const byte of bytes) {
-    const m = BigInt(byte) * REDUNDANCY_MULTIPLIER; // m' = m * 257
-    const c = mod(m * (m + b), n);
-    encrypted.push(c);
-  }
-  return encrypted;
-}
+
+/* ------------------------------------------------------------------ */
+/*  Encryption                                                         */
+/* ------------------------------------------------------------------ */
+
 
 /**
- * Вычисляет квадратные корни по модулю n = p*q с помощью китайской теоремы об остатках.
- * Так как p, q ≡ 3 (mod 4), sqrt вычисляется как: m = ±(D^((p+1)/4)) mod p.
- * @param {bigint} D - Значение, из которого извлекается корень (по модулю n).
- * @param {bigint} p - Первое простое (≡ 3 mod 4).
- * @param {bigint} q - Второе простое (≡ 3 mod 4).
- * @returns {bigint[]} Массив из 4 возможных корней по модулю n.
+ * Encrypt arbitrary binary data with the Rabin cryptosystem.
+ *
+ * @param {Uint8Array} data — plaintext bytes
+ * @param {bigint} b
+ * @param {bigint} n  — public key n = p·q
+ * @returns {Uint8Array} — ciphertext (concatenation of fixed-width cipher blocks)
  */
-function sqrtModByCRT(D, p, q) {
-  // Вычисляем квадратные корни по модулю p и q, используя факт что p ≡ 3 (mod 4)
-  const sqrtP = fastExp(mod(D, p), (p + 1n) / 4n, p);
-  const sqrtQ = fastExp(mod(D, q), (q + 1n) / 4n, q);
+export function rabinEncrypt(data, b, n) {
+    const nBytes = byteLength(n);
 
-  // Используем расширенный алгоритм Евклида для нахождения коэффициентов КТО
-  const { x: coeffP, y: coeffQ } = euclidEx(p, q);
-
-  const n = p * q;
-  // Объединяем корни с помощью КТО для получения 4 решений по модулю n
-  const root1 = mod(coeffP * p * sqrtQ + coeffQ * q * sqrtP, n);
-  const root2 = mod(n - root1, n);
-  const root3 = mod(coeffP * p * sqrtQ - coeffQ * q * sqrtP, n);
-  const root4 = mod(n - root3, n);
-
-  return [root1, root2, root3, root4];
-}
-
-/**
- * Восстанавливает исходный байт сообщения из квадратного корня.
- * Решает: m = (di - b) / 2 mod n для исходного сообщения.
- * Так как работаем по нечётному модулю n, 2 имеет модульный обратный.
- * @param {bigint} root - Квадратный корень из (b^2 + 4c) mod n.
- * @param {bigint} b - Параметр шифрования.
- * @param {bigint} n - Модуль (должен быть нечётным).
- * @returns {bigint} Восстановленное значение сообщения.
- */
-function recoverMessageFromRoot(root, b, n) {
-  const adjusted = mod(root - b, n);
-  // Вычисляем модульный обратный 2 по модулю n (так как n нечётный, gcd(2,n)=1)
-  // 2^(-1) mod n = (n+1)/2 когда n нечётное
-  const inv2 = (n + 1n) / 2n;
-  return mod(adjusted * inv2, n);
-}
-
-/**
- * Расшифровывает одно зашифрованное значение и возвращает исходный байт.
- * Пробует все 4 возможных квадратных корня, проверяет повторным шифрованием,
- * и учитывает смещение избыточности (256), добавленное при шифровании.
- * @param {bigint} ciphertext - Зашифрованное значение.
- * @param {bigint} p - Первое простое.
- * @param {bigint} q - Второе простое.
- * @param {bigint} b - Параметр шифрования.
- * @returns {number} Расшифрованный байт (0-255).
- * @throws {Error} Если не удалось восстановить байт.
- */
-function decryptValue(ciphertext, p, q, b) {
-  const n = p * q;
-  const discriminant = mod(b * b + 4n * ciphertext, n);
-  const roots = sqrtModByCRT(discriminant, p, q);
-
-  for (const root of roots) {
-    const messageWithRedundancy = recoverMessageFromRoot(root, b, n);
-    // Проверяем равенство старшего и младшего байта (проверка избыточности: m' = m*256 + m)
-    const lowByte = messageWithRedundancy & 255n;
-    const highByte = messageWithRedundancy >> 8n;
-    if (lowByte === highByte && messageWithRedundancy >= 0n) {
-      // Проверяем повторным шифрованием
-      const reEncrypted = mod(messageWithRedundancy * (messageWithRedundancy + b), n);
-      if (reEncrypted === ciphertext && lowByte <= 255n) {
-        return Number(lowByte);
-      }
+    // Find the largest number of data bytes k such that the worst-case
+    // padded value  (k+2 bytes, all 0xFF) = 256^(k+2) − 1  is still < n.
+    // This guarantees every padded message m < n.
+    let blockSize = 0;
+    for (let k = 1; k <= nBytes; k++) {
+        // worst-case padded value with k data bytes:  (256^(k + MARKER_LEN)) - 1
+        const worstCase = (1n << (BigInt(k + MARKER_LEN) * 8n)) - 1n;
+        if (worstCase < n) {
+            blockSize = k;
+        } else {
+            break;
+        }
     }
-  }
 
-  throw new Error(`Не удалось однозначно восстановить байт для c=${ciphertext.toString()}.`);
+    if (blockSize < 1) {
+        throw new Error('n слишком мало для блочного шифрования');
+    }
+
+    const cipherBlockSize = nBytes;                          // each cipher block = nBytes
+    const blockCount = Math.ceil(data.length / blockSize);
+    const out = new Uint8Array(blockCount * cipherBlockSize);
+
+    for (let i = 0; i < blockCount; i++) {
+        // 1. Extract plaintext chunk (may be shorter than blockSize for the last block)
+        const start = i * blockSize;
+        const end = Math.min(start + blockSize, data.length);
+        const chunk = data.slice(start, end);
+
+        // 2. Append marker: chunk ‖ 0xFF 0xFF
+        const padded = new Uint8Array(chunk.length + MARKER_LEN);
+        padded.set(chunk, 0);
+        padded.set(MARKER, chunk.length);
+
+        // 3. Convert to BigInt  m
+        const m = bytesToBigint(padded);
+
+        // Safety check (should never trigger with correct blockSize)
+        if (m >= n) {
+            throw new Error(`Блок ${i + 1}: m (${m}) >= n (${n}), невозможно зашифровать`);
+        }
+
+        // 4. Encrypt:  c = m·(m + b) mod n
+        const c = mod(m * (m + b), n);
+
+        // 5. Write cipher block (fixed width)
+        const cBytes = bigintToBytes(c, cipherBlockSize);
+        out.set(cBytes, i * cipherBlockSize);
+    }
+
+    return out;
 }
 
+
+/* ------------------------------------------------------------------ */
+/*  Decryption                                                         */
+/* ------------------------------------------------------------------ */
+
+
 /**
- * Расшифровывает массив зашифрованных значений обратно в исходные байты.
- * @param {bigint[]} values - Массив зашифрованных значений (BigInt).
- * @param {bigint} p - Первый простой параметр.
- * @param {bigint} q - Второй простой параметр.
- * @param {bigint} b - Параметр шифрования.
- * @returns {Uint8Array} Расшифрованные байты.
+ * Decrypt Rabin ciphertext back to plaintext.
+ *
+ * For each cipher block:
+ *   1. Compute discriminant D = b² + 4c (mod n)
+ *   2. Square roots mod p, mod q  (possible because p,q ≡ 3 mod 4)
+ *   3. CRT → 4 candidate roots  r1…r4
+ *   4. For each root:  m_candidate = (−b + root) / 2  mod n
+ *      (division by 2 is modular inverse)
+ *   5. Pick the candidate whose byte representation ends with 0xFF 0xFF
+ *
+ * @param {Uint8Array} cipherData
+ * @param {bigint} b
+ * @param {bigint} n
+ * @param {bigint} p
+ * @param {bigint} q
+ * @returns {Uint8Array} — recovered plaintext
  */
-export function decryptValues(values, p, q, b) {
-  const out = new Uint8Array(values.length);
-  for (let i = 0; i < values.length; i += 1) {
-    out[i] = decryptValue(values[i], p, q, b);
-  }
-  return out;
+export function rabinDecrypt(cipherData, b, n, p, q) {
+    const nBytes = byteLength(n);
+    const cipherBlockSize = nBytes;
+    const blockCount = cipherData.length / cipherBlockSize;
+
+    if (!Number.isInteger(blockCount) || blockCount === 0) {
+        throw new Error('Некорректная длина шифротекста');
+    }
+
+    // Pre-compute CRT coefficients  (only once)
+    const { x: yp, y: yq } = gcdExtended(p, q);   // p·yp + q·yq = 1
+
+    // Modular inverse of 2 mod n (needed for m = (root - b) / 2 mod n)
+    const inv2 = mod(power(2n, n - p - q, n), n);  // Euler-totient shortcut
+    // Alternatively: inv2 = gcdExtended(2n, n).x mod n
+    // Using (n+1n)/2n works when n is odd (always true for product of two odd primes)
+    const inv2Simple = (n + 1n) / 2n;               // because 2·((n+1)/2) = n+1 ≡ 1 mod n
+
+    const chunks = [];
+
+    for (let i = 0; i < blockCount; i++) {
+        const cBytes = cipherData.slice(i * cipherBlockSize, (i + 1) * cipherBlockSize);
+        const c = bytesToBigint(cBytes);
+
+        // D = b² + 4c  mod n
+        const D = mod(b * b + 4n * c, n);
+
+        // Square roots mod p and mod q  (p,q ≡ 3 mod 4 ⇒ exponent (p+1)/4)
+        const mp = power(D, (p + 1n) / 4n, p);
+        const mq = power(D, (q + 1n) / 4n, q);
+
+        // CRT combination for ±mp, ±mq  →  4 roots of D mod n
+        const t1 = mod(yp * p * mq, n);
+        const t2 = mod(yq * q * mp, n);
+
+        const roots = [
+            mod(t1 + t2, n),
+            mod(n - (t1 + t2), n),
+            mod(t1 - t2, n),
+            mod(n - (t1 - t2), n),
+        ];
+
+        // For each root r, candidate message = (−b + r) / 2  mod n  = (r - b) · inv2 mod n
+        // The padded block is between (MARKER_LEN+1) and (nBytes-1) bytes wide.
+        // We try each plausible width for the marker check.
+        let found = false;
+        for (const r of roots) {
+            const m = mod((r - b) * inv2Simple, n);
+
+            // Verify this candidate re-encrypts to c
+            if (mod(m * (m + b), n) !== c) continue;
+
+            // Try plausible padded widths: from max (nBytes - 1) down to min (MARKER_LEN + 1)
+            const maxW = nBytes - 1;
+            const minW = MARKER_LEN + 1;       // at least 1 data byte + 2 marker bytes
+            for (let w = maxW; w >= minW; w--) {
+                const mBytes = bigintToBytes(m, w);
+
+                if (mBytes[w - 2] === 0xFF &&
+                    mBytes[w - 1] === 0xFF) {
+                    // Strip marker → original chunk
+                    const plainChunk = mBytes.slice(0, w - MARKER_LEN);
+                    chunks.push(plainChunk);
+                    found = true;
+                    break;
+                }
+            }
+            if (found) break;
+        }
+
+        if (!found) {
+            throw new Error(`Не удалось найти корректный корень для блока ${i + 1}`);
+        }
+    }
+
+    // Concatenate all plaintext chunks
+    const totalLen = chunks.reduce((s, c) => s + c.length, 0);
+    const result = new Uint8Array(totalLen);
+    let offset = 0;
+    for (const chunk of chunks) {
+        result.set(chunk, offset);
+        offset += chunk.length;
+    }
+
+    return result;
+}
+
+
+/* ------------------------------------------------------------------ */
+/*  Convenience: produce decimal-string representation of ciphertext   */
+/* ------------------------------------------------------------------ */
+
+
+/**
+ * Convert cipher bytes to a space-separated list of decimal BigInt blocks.
+ * Each cipher block is read as a BigInt and printed in base 10.
+ *
+ * @param {Uint8Array} cipherData
+ * @param {bigint} n
+ * @returns {string}
+ */
+export function cipherToDecimalString(cipherData, n) {
+    const cipherBlockSize = byteLength(n);
+    const count = cipherData.length / cipherBlockSize;
+    const parts = [];
+    for (let i = 0; i < count; i++) {
+        const block = cipherData.slice(i * cipherBlockSize, (i + 1) * cipherBlockSize);
+        parts.push(bytesToBigint(block).toString(10));
+    }
+    return parts.join(' ');
+}
+
+
+/**
+ * Parse a decimal-string representation back to cipher bytes.
+ *
+ * @param {string} text — space-separated decimal BigInt values
+ * @param {bigint} n
+ * @returns {Uint8Array}
+ */
+export function decimalStringToCipher(text, n) {
+    const cipherBlockSize = byteLength(n);
+    const values = text.trim().split(/\s+/).map(s => BigInt(s));
+    const out = new Uint8Array(values.length * cipherBlockSize);
+    for (let i = 0; i < values.length; i++) {
+        const bytes = bigintToBytes(values[i], cipherBlockSize);
+        out.set(bytes, i * cipherBlockSize);
+    }
+    return out;
 }
