@@ -1,21 +1,17 @@
 /**
- * math.js — Core Mathematical Functions (BigInt-based)
- * 
- * Provides:
- *   - mod(a, n)           — non-negative modular remainder
- *   - gcdExtended(a, b)   — Extended Euclidean Algorithm (Bézout coefficients)
- *   - power(base, exp, mod) — Binary (square-and-multiply) modular exponentiation
- *   - isPrime(n)          — Trial-division primality test
+ * math.js — Математические функции (на BigInt)
+ *
+ * Предоставляет:
+ *   - mod(a, n)           — неотрицательный остаток
+ *   - gcdExtended(a, b)   — Расширенный алгоритм Евклида (коэффициенты Безу)
+ *   - power(base, exp, mod) — Бинарное (квадратно-умножительное) возведение в степень
+ *   - isPrime(n)          — Проверка простоты методом пробного деления
  */
 
 
 /**
- * Non-negative modular remainder.
- * Guarantees result in [0, n-1] even when a is negative.
- *
- * @param {bigint} a  — dividend
- * @param {bigint} n  — modulus (> 0)
- * @returns {bigint}  — a mod n ∈ [0, n-1]
+ * Неотрицательный остаток.
+ * Гарантирует результат в [0, n-1] даже при отрицательном a.
  */
 export function mod(a, n) {
     const r = a % n;
@@ -24,16 +20,8 @@ export function mod(a, n) {
 
 
 /**
- * Extended Euclidean Algorithm.
- * Finds integers x, y such that a·x + b·y = gcd(a, b).
- *
- * @param {bigint} a
- * @param {bigint} b
- * @returns {{ gcd: bigint, x: bigint, y: bigint }}
- *
- * @example
- *   gcdExtended(15n, 6n) → { gcd: 3n, x: 1n, y: -2n }
- *   // 15·1 + 6·(-2) = 3
+ * Расширенный алгоритм Евклида.
+ * Находит x, y такие что a·x + b·y = gcd(a, b).
  */
 export function gcdExtended(a, b) {
     let x0 = 1n, y0 = 0n;
@@ -58,16 +46,8 @@ export function gcdExtended(a, b) {
 
 
 /**
- * Modular exponentiation (binary / square-and-multiply).
- * Computes  base^exp mod m  efficiently.
- *
- * @param {bigint} base
- * @param {bigint} exp   — must be ≥ 0
- * @param {bigint} m     — modulus (> 0)
- * @returns {bigint}
- *
- * @example
- *   power(2n, 10n, 1000n)  // 24n   (2^10 = 1024 mod 1000)
+ * Бинарное возведение в степень по модулю.
+ * Вычисляет  base^exp mod m  эффективно.
  */
 export function power(base, exp, m) {
     let result = 1n;
@@ -86,11 +66,9 @@ export function power(base, exp, m) {
 
 
 /**
- * Trial-division primality test, optimised with 6k ± 1 wheel.
- * Sufficient for the key sizes used in this lab.
- *
- * @param {bigint} n
- * @returns {boolean}
+ * Проверка простоты.
+ * Метод пробного деления с колесом 6k ± 1.
+ * Достаточно для размеров ключей в этой лабораторной.
  */
 export function isPrime(n) {
     if (n <= 1n) return false;

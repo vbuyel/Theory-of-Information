@@ -1,13 +1,13 @@
 /**
- * main.js — Controller / DOM orchestration
+ * main.js — Управление / DOM
  *
- * Imports modules:
- *   math.js        → isPrime (used transitively via rabin.js)
+ * Импорты:
+ *   math.js        → isPrime (используется через rabin.js)
  *   rabin.js       → validateParams, rabinEncrypt, rabinDecrypt,
  *                    cipherToDecimalString, decimalStringToCipher
  *   fileHandler.js → readFileAsArrayBuffer, downloadFile
  *
- * Wires up every DOM element from index.html and manages application state.
+ * Связывает DOM-элементы из index.html и управляет состоянием приложения.
  */
 
 import {
@@ -24,26 +24,23 @@ import {
 } from './fileHandler.js';
 
 
-/* ================================================================== */
-/*  Application state                                                  */
-/* ================================================================== */
-let currentFileData = null;   // Uint8Array — raw bytes of the selected file
-let currentFileName = '';     // original file name
-let lastCipherData = null;   // Uint8Array — last encryption result (raw cipher bytes)
-let lastPlainData = null;   // Uint8Array — last decryption result (recovered bytes)
+// ===== Состояние приложения =====
+let currentFileData = null;   // Uint8Array — байты загруженного файла
+let currentFileName = '';     // имя файла
+let lastCipherData = null;   // Uint8Array — результат шифрования
+let lastPlainData = null;   // Uint8Array — результат дешифрования
 let operationMode = null;   // 'encrypt' | 'decrypt' | null
 
-/* ================================================================== */
-/*  DOM element cache (populated in init())                            */
-/* ================================================================== */
+
+// ===== Кэш DOM-элементов =====
 let els = {};
 
 
-/* ================================================================== */
-/*  UI helpers                                                         */
-/* ================================================================== */
+// ===== Утилиты UI =====
 
-/** Show an error message in .error-messages */
+/**
+ * Показать сообщение об ошибке.
+ */
 function showError(msg) {
     const box = els.errorMessages;
     if (!box) return;
@@ -51,7 +48,9 @@ function showError(msg) {
     box.classList.add('active');
 }
 
-/** Clear the error banner */
+/**
+ * Скрыть сообщение об ошибке.
+ */
 function clearError() {
     const box = els.errorMessages;
     if (!box) return;
@@ -59,26 +58,28 @@ function clearError() {
     box.classList.remove('active');
 }
 
-/** Display text in the output section */
+/**
+ * Показать текст в секции вывода.
+ */
 function showOutput(text) {
     if (els.resultOutput) els.resultOutput.textContent = text;
     if (els.outputSection) els.outputSection.style.display = 'block';
 }
 
-/** Hide the output section */
+/**
+ * Скрыть секцию вывода.
+ */
 function hideOutput() {
     if (els.resultOutput) els.resultOutput.textContent = '';
     if (els.outputSection) els.outputSection.style.display = 'none';
 }
 
 
-/* ================================================================== */
-/*  Input parsing / validation                                         */
-/* ================================================================== */
+// ===== Валидация параметров =====
 
 /**
- * Read p, q, b from the DOM, validate, and return parsed BigInts.
- * Shows an error and returns null on failure.
+ * Читает p, q, b из DOM, валидирует и возвращает BigInt.
+ * Показывает ошибку и возвращает null при неудаче.
  *
  * @returns {{ p: bigint, q: bigint, b: bigint, n: bigint } | null}
  */
@@ -113,9 +114,7 @@ function getParams() {
 }
 
 
-/* ================================================================== */
-/*  File handling                                                      */
-/* ================================================================== */
+// ===== Обработка файла =====
 
 async function handleFileSelect() {
     const file = els.fileInput?.files?.[0];
@@ -133,9 +132,7 @@ async function handleFileSelect() {
 }
 
 
-/* ================================================================== */
-/*  Encrypt                                                            */
-/* ================================================================== */
+// ===== Шифрование =====
 
 function encryptFile() {
     clearError();
@@ -153,12 +150,12 @@ function encryptFile() {
     try {
         const cipherBytes = rabinEncrypt(currentFileData, b, n);
 
-        // Save for later download
+        // Сохраняем для скачивания
         lastCipherData = cipherBytes;
         lastPlainData = null;
         operationMode = 'encrypt';
 
-        // Display cipher blocks as decimal numbers
+        // Выводим блоки шифротекста как десятичные числа
         const decStr = cipherToDecimalString(cipherBytes, n);
         showOutput(decStr);
     } catch (err) {
@@ -167,9 +164,7 @@ function encryptFile() {
 }
 
 
-/* ================================================================== */
-/*  Decrypt                                                            */
-/* ================================================================== */
+// ===== Дешифрование =====
 
 function decryptFile() {
     clearError();
@@ -179,14 +174,14 @@ function decryptFile() {
 
     const { p, q, b, n } = params;
 
-    // Get cipher text — either from the last encryption or from the output box
+    // Получаем шифротекст — либо после шифрования, либо из поля вывода
     let cipherBytes;
 
     if (lastCipherData) {
-        // Decrypt the result of a previous encryption
+        // Дешифруем результат предыдущего шифрования
         cipherBytes = lastCipherData;
     } else {
-        // Try to parse decimal text from the output area
+        // Пробуем распарсить десятичный текст из поля вывода
         const text = els.resultOutput?.textContent?.trim();
         if (!text) {
             showError('Сначала зашифруйте файл или загрузите шифротекст');
@@ -207,7 +202,7 @@ function decryptFile() {
         lastCipherData = null;
         operationMode = 'decrypt';
 
-        // Show preview (first 200 bytes as decimals)
+        // Показываем превью (первые 200 байт как десятичные числа)
         const preview = Array.from(plainBytes).slice(0, 200).join(' ');
         showOutput(preview + (plainBytes.length > 200 ? ' …' : ''));
     } catch (err) {
@@ -216,18 +211,14 @@ function decryptFile() {
 }
 
 
-/* ================================================================== */
-/*  Save / Download                                                    */
-/* ================================================================== */
+// ===== Сохранение =====
 
 function saveData() {
     if (operationMode === 'encrypt' && lastCipherData) {
-        // Save encrypted data as binary file
-        // file.png → encrypted_file.png
+        // Сохраняем зашифрованные данные
         downloadFile(lastCipherData, currentFileName || 'data.bin', 'encrypted');
     } else if (operationMode === 'decrypt' && lastPlainData) {
-        // Save decrypted data
-        // encrypted_file.png → decrypted_encrypted_file.png
+        // Сохраняем расшифрованные данные
         downloadFile(lastPlainData, currentFileName || 'data.bin', 'decrypted');
     } else {
         showError('Нет данных для сохранения');
@@ -235,9 +226,7 @@ function saveData() {
 }
 
 
-/* ================================================================== */
-/*  Clear                                                              */
-/* ================================================================== */
+// ===== Очистка =====
 
 function clearAll() {
     if (els.pInput) els.pInput.value = '';
@@ -257,9 +246,7 @@ function clearAll() {
 }
 
 
-/* ================================================================== */
-/*  Initialisation                                                     */
-/* ================================================================== */
+// ===== Инициализация =====
 
 function init() {
     els = {
@@ -275,24 +262,24 @@ function init() {
         errorMessages: document.querySelector('.error-messages'),
     };
 
-    // File picker: visible button triggers hidden <input type="file">
+    // Выбор файла: видимая кнопка открывает скрытый <input type="file">
     els.btnChooseFile?.addEventListener('click', () => els.fileInput?.click());
     els.fileInput?.addEventListener('change', handleFileSelect);
 
-    // Action buttons (selected by class — matches the HTML)
+    // Кнопки действий
     document.querySelector('.action-btn-encrypt')?.addEventListener('click', encryptFile);
     document.querySelector('.action-btn-decrypt')?.addEventListener('click', decryptFile);
     document.querySelector('.action-btn-clear')?.addEventListener('click', clearAll);
     els.btnSave?.addEventListener('click', saveData);
 
-    // Clear errors on typing
+    // Очищаем ошибки при вводе
     els.pInput?.addEventListener('input', clearError);
     els.qInput?.addEventListener('input', clearError);
     els.bInput?.addEventListener('input', clearError);
 }
 
 
-// Auto-run when the DOM is ready
+// Запускаем при готовности DOM
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
 } else {

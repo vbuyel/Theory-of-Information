@@ -1,41 +1,35 @@
 /**
- * rabin.js — Rabin Cryptosystem: encryption / decryption
+ * rabin.js — Криптосистема Рабина: шифрование / дешифрование
  *
- * Encryption formula:
+ * Формула шифрования:
  *   C = m * (m + b) mod n
  *
- * Padding strategy — 2-byte marker (0xFF 0xFF)
- *   Before encrypting each block, two bytes 0xFF 0xFF are appended.
- *   After decryption, the correct root (out of 4 CRT candidates) is
- *   identified as the one whose trailing 2 bytes equal the marker.
+ * Стратегия дополнения — 2-байтовый маркер (0xFF 0xFF)
+ *   Перед шифрованием каждого блока добавляются два байта 0xFF 0xFF.
+ *   После дешифрования правильный корень (из 4 кандидатов CRT)
+ *   определяется по последним 2 байтам, равным маркеру.
  *
- * Block layout
- *   n = p * q determines maximum block value.
- *   blockSize  = byte-length of (n − 1), minus 2 bytes reserved for the marker.
- *   Each plaintext chunk of `blockSize` bytes is concatenated with 0xFF 0xFF,
- *   converted to a BigInt, encrypted, and stored as a fixed-width BigInt
- *   occupying `cipherBlockSize` bytes (byte-length of n).
+ * Размер блока
+ *   n = p * q определяет максимальное значение блока.
+ *   blockSize  = длина n в байтах минус 2 байта под маркер.
+ *   Каждый чанк данных размера blockSize дополняется 0xFF 0xFF,
+ *   преобразуется в BigInt, шифруется и сохраняется как фиксированный BigInt
+ *   размера cipherBlockSize (длина n в байтах).
  */
 
 import { mod, gcdExtended, power, isPrime } from './math.js';
 
 
-/* ------------------------------------------------------------------ */
-/*  Marker constants                                                   */
-/* ------------------------------------------------------------------ */
+// ===== Константы маркера =====
 const MARKER = new Uint8Array([0xFF, 0xFF]);
 const MARKER_LEN = MARKER.length;            // 2
 
 
-/* ------------------------------------------------------------------ */
-/*  Helpers: BigInt ↔ byte-array conversions (big-endian)              */
-/* ------------------------------------------------------------------ */
+// ===== Утилиты: BigInt ↔ массив байтов (big-endian) =====
 
 
 /**
- * Return how many bytes are needed to represent value (≥ 1).
- * @param {bigint} value
- * @returns {number}
+ * Возвращает количество байт для представления значения (≥ 1).
  */
 function byteLength(value) {
     if (value <= 0n) return 1;
@@ -47,7 +41,7 @@ function byteLength(value) {
 
 
 /**
- * BigInt → Uint8Array (big-endian), zero-padded to `len` bytes.
+ * BigInt → Uint8Array (big-endian), дополненный нулями до len байт.
  */
 function bigintToBytes(value, len) {
     const bytes = new Uint8Array(len);
@@ -72,24 +66,17 @@ function bytesToBigint(bytes) {
 }
 
 
-/* ------------------------------------------------------------------ */
-/*  Parameter validation                                               */
-/* ------------------------------------------------------------------ */
+// ===== Валидация параметров =====
 
 
 /**
- * Validate Rabin parameters p, q, b.
+ * Валидирует параметры Рабина p, q, b.
  *
- * Checks:
- *   - p and q are prime
- *   - p ≡ 3 (mod 4) and q ≡ 3 (mod 4)
+ * Проверки:
+ *   - p и q простые
+ *   - p ≡ 3 (mod 4) и q ≡ 3 (mod 4)
  *   - p ≠ q
  *   - 0 < b < n
- *
- * @param {bigint} p
- * @param {bigint} q
- * @param {bigint} b
- * @returns {{ valid: boolean, error?: string, n?: bigint }}
  */
 export function validateParams(p, q, b) {
     if (!isPrime(p)) return { valid: false, error: 'p не является простым числом' };
@@ -100,8 +87,8 @@ export function validateParams(p, q, b) {
 
     const n = p * q;
 
-    // n must be large enough so that (1 data byte ‖ 0xFF 0xFF) as BigInt < n
-    // worst case: 0xFF 0xFF 0xFF = 16 777 215, so n must be > 16 777 215
+    // n должен быть достаточно большим: (1 байт данных ‖ 0xFF 0xFF) как BigInt < n
+    // худший случай: 0xFF 0xFF 0xFF = 16 777 215, поэтому n > 16 777 215
     const MIN_N = (1n << 24n);  // 16 777 216
     if (n < MIN_N) return { valid: false, error: `n = p·q слишком мало (нужно n ≥ ${MIN_N}, сейчас n = ${n})` };
     if (b <= 0n || b >= n) return { valid: false, error: 'b должно быть в диапазоне 0 < b < n' };
@@ -110,28 +97,20 @@ export function validateParams(p, q, b) {
 }
 
 
-/* ------------------------------------------------------------------ */
-/*  Encryption                                                         */
-/* ------------------------------------------------------------------ */
+// ===== Шифрование =====
 
 
 /**
- * Encrypt arbitrary binary data with the Rabin cryptosystem.
- *
- * @param {Uint8Array} data — plaintext bytes
- * @param {bigint} b
- * @param {bigint} n  — public key n = p·q
- * @returns {Uint8Array} — ciphertext (concatenation of fixed-width cipher blocks)
+ * Шифрует произвольные бинарные данные криптосистемой Рабина.
  */
 export function rabinEncrypt(data, b, n) {
     const nBytes = byteLength(n);
 
-    // Find the largest number of data bytes k such that the worst-case
-    // padded value  (k+2 bytes, all 0xFF) = 256^(k+2) − 1  is still < n.
-    // This guarantees every padded message m < n.
+    // Находим максимальный размер данных k, при котором
+    // дополненное значение (k+2 байт, все 0xFF) = 256^(k+2) − 1 < n
     let blockSize = 0;
     for (let k = 1; k <= nBytes; k++) {
-        // worst-case padded value with k data bytes:  (256^(k + MARKER_LEN)) - 1
+        // худший случай с k байт данных: (256^(k + MARKER_LEN)) - 1
         const worstCase = (1n << (BigInt(k + MARKER_LEN) * 8n)) - 1n;
         if (worstCase < n) {
             blockSize = k;
@@ -144,33 +123,33 @@ export function rabinEncrypt(data, b, n) {
         throw new Error('n слишком мало для блочного шифрования');
     }
 
-    const cipherBlockSize = nBytes;                          // each cipher block = nBytes
+    const cipherBlockSize = nBytes;                          // каждый шифроблок = nBytes
     const blockCount = Math.ceil(data.length / blockSize);
     const out = new Uint8Array(blockCount * cipherBlockSize);
 
     for (let i = 0; i < blockCount; i++) {
-        // 1. Extract plaintext chunk (may be shorter than blockSize for the last block)
+        // 1. Извлекаем чанк данных (может быть короче blockSize для последнего блока)
         const start = i * blockSize;
         const end = Math.min(start + blockSize, data.length);
         const chunk = data.slice(start, end);
 
-        // 2. Append marker: chunk ‖ 0xFF 0xFF
+        // 2. Добавляем маркер: chunk ‖ 0xFF 0xFF
         const padded = new Uint8Array(chunk.length + MARKER_LEN);
         padded.set(chunk, 0);
         padded.set(MARKER, chunk.length);
 
-        // 3. Convert to BigInt  m
+        // 3. Преобразуем в BigInt m
         const m = bytesToBigint(padded);
 
-        // Safety check (should never trigger with correct blockSize)
+        // Проверка (не должна сработать при правильном blockSize)
         if (m >= n) {
             throw new Error(`Блок ${i + 1}: m (${m}) >= n (${n}), невозможно зашифровать`);
         }
 
-        // 4. Encrypt:  c = m·(m + b) mod n
+        // 4. Шифруем:  c = m·(m + b) mod n
         const c = mod(m * (m + b), n);
 
-        // 5. Write cipher block (fixed width)
+        // 5. Записываем шифроблок (фиксированная ширина)
         const cBytes = bigintToBytes(c, cipherBlockSize);
         out.set(cBytes, i * cipherBlockSize);
     }
@@ -179,28 +158,19 @@ export function rabinEncrypt(data, b, n) {
 }
 
 
-/* ------------------------------------------------------------------ */
-/*  Decryption                                                         */
-/* ------------------------------------------------------------------ */
+// ===== Дешифрование =====
 
 
 /**
- * Decrypt Rabin ciphertext back to plaintext.
+ * Дешифрует шифротекст Рабина обратно в открытый текст.
  *
- * For each cipher block:
- *   1. Compute discriminant D = b² + 4c (mod n)
- *   2. Square roots mod p, mod q  (possible because p,q ≡ 3 mod 4)
- *   3. CRT → 4 candidate roots  r1…r4
- *   4. For each root:  m_candidate = (−b + root) / 2  mod n
- *      (division by 2 is modular inverse)
- *   5. Pick the candidate whose byte representation ends with 0xFF 0xFF
- *
- * @param {Uint8Array} cipherData
- * @param {bigint} b
- * @param {bigint} n
- * @param {bigint} p
- * @param {bigint} q
- * @returns {Uint8Array} — recovered plaintext
+ * Для каждого шифроблока:
+ *   1. Вычисляем дискриминант D = b² + 4c (mod n)
+ *   2. Корни по модулю p, q (возможно, потому что p,q ≡ 3 mod 4)
+ *   3. CRT → 4 кандидата r1…r4
+ *   4. Для каждого корня:  m_candidate = (−b + root) / 2  mod n
+ *      (деление — модулярный обратный элемент)
+ *   5. Выбираем кандинат, чьи последние 2 байта равны 0xFF 0xFF
  */
 export function rabinDecrypt(cipherData, b, n, p, q) {
     const nBytes = byteLength(n);
@@ -211,14 +181,13 @@ export function rabinDecrypt(cipherData, b, n, p, q) {
         throw new Error('Некорректная длина шифротекста');
     }
 
-    // Pre-compute CRT coefficients  (only once)
+    // Предвычисляем коэффициенты CRT (только один раз)
     const { x: yp, y: yq } = gcdExtended(p, q);   // p·yp + q·yq = 1
 
-    // Modular inverse of 2 mod n (needed for m = (root - b) / 2 mod n)
-    const inv2 = mod(power(2n, n - p - q, n), n);  // Euler-totient shortcut
-    // Alternatively: inv2 = gcdExtended(2n, n).x mod n
-    // Using (n+1n)/2n works when n is odd (always true for product of two odd primes)
-    const inv2Simple = (n + 1n) / 2n;               // because 2·((n+1)/2) = n+1 ≡ 1 mod n
+    // Модулярный обратный элемент 2 по модулю n (нужен для m = (root - b) / 2 mod n)
+    const inv2 = mod(power(2n, n - p - q, n), n);
+    // Упрощённый вариант: (n+1n)/2n работает для нечётного n (всегда верно для произведения двух нечётных простых)
+    const inv2Simple = (n + 1n) / 2n;
 
     const chunks = [];
 
@@ -229,11 +198,11 @@ export function rabinDecrypt(cipherData, b, n, p, q) {
         // D = b² + 4c  mod n
         const D = mod(b * b + 4n * c, n);
 
-        // Square roots mod p and mod q  (p,q ≡ 3 mod 4 ⇒ exponent (p+1)/4)
+        // Корни по модулю p и q (p,q ≡ 3 mod 4 ⇒ показатель (p+1)/4)
         const mp = power(D, (p + 1n) / 4n, p);
         const mq = power(D, (q + 1n) / 4n, q);
 
-        // CRT combination for ±mp, ±mq  →  4 roots of D mod n
+        // CRT комбинация для ±mp, ±mq  →  4 корня D mod n
         const t1 = mod(yp * p * mq, n);
         const t2 = mod(yq * q * mp, n);
 
@@ -244,25 +213,25 @@ export function rabinDecrypt(cipherData, b, n, p, q) {
             mod(n - (t1 - t2), n),
         ];
 
-        // For each root r, candidate message = (−b + r) / 2  mod n  = (r - b) · inv2 mod n
-        // The padded block is between (MARKER_LEN+1) and (nBytes-1) bytes wide.
-        // We try each plausible width for the marker check.
+        // Для каждого корня r: m = (−b + r) / 2 mod n = (r - b) · inv2 mod n
+        // Дополненный блок имеет размер от (MARKER_LEN+1) до (nBytes-1) байт.
+        // Проверяем разные ширины для маркера.
         let found = false;
         for (const r of roots) {
             const m = mod((r - b) * inv2Simple, n);
 
-            // Verify this candidate re-encrypts to c
+            // Проверяем, что кандидат решифруется обратно в c
             if (mod(m * (m + b), n) !== c) continue;
 
-            // Try plausible padded widths: from max (nBytes - 1) down to min (MARKER_LEN + 1)
+            // Пробуем разные ширины: от max (nBytes - 1) до min (MARKER_LEN + 1)
             const maxW = nBytes - 1;
-            const minW = MARKER_LEN + 1;       // at least 1 data byte + 2 marker bytes
+            const minW = MARKER_LEN + 1;       // минимум 1 байт данных + 2 байта маркера
             for (let w = maxW; w >= minW; w--) {
                 const mBytes = bigintToBytes(m, w);
 
                 if (mBytes[w - 2] === 0xFF &&
                     mBytes[w - 1] === 0xFF) {
-                    // Strip marker → original chunk
+                    // Удаляем маркер → исходный чанк
                     const plainChunk = mBytes.slice(0, w - MARKER_LEN);
                     chunks.push(plainChunk);
                     found = true;
@@ -277,7 +246,7 @@ export function rabinDecrypt(cipherData, b, n, p, q) {
         }
     }
 
-    // Concatenate all plaintext chunks
+    // Объединяем все чанки данных
     const totalLen = chunks.reduce((s, c) => s + c.length, 0);
     const result = new Uint8Array(totalLen);
     let offset = 0;
@@ -290,18 +259,12 @@ export function rabinDecrypt(cipherData, b, n, p, q) {
 }
 
 
-/* ------------------------------------------------------------------ */
-/*  Convenience: produce decimal-string representation of ciphertext   */
-/* ------------------------------------------------------------------ */
+// ===== Утилиты: представление шифротекста в виде строки десятичных чисел =====
 
 
 /**
- * Convert cipher bytes to a space-separated list of decimal BigInt blocks.
- * Each cipher block is read as a BigInt and printed in base 10.
- *
- * @param {Uint8Array} cipherData
- * @param {bigint} n
- * @returns {string}
+ * Преобразует байты шифротектса в строку десятичных чисел через пробел.
+ * Каждый шифроблок читается как BigInt и выводится в base 10.
  */
 export function cipherToDecimalString(cipherData, n) {
     const cipherBlockSize = byteLength(n);
@@ -316,11 +279,7 @@ export function cipherToDecimalString(cipherData, n) {
 
 
 /**
- * Parse a decimal-string representation back to cipher bytes.
- *
- * @param {string} text — space-separated decimal BigInt values
- * @param {bigint} n
- * @returns {Uint8Array}
+ * Парсит строку десятичных чисел обратно в байты шифротекста.
  */
 export function decimalStringToCipher(text, n) {
     const cipherBlockSize = byteLength(n);

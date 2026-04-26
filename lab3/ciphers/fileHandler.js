@@ -1,17 +1,14 @@
 /**
- * fileHandler.js — File I/O utilities
+ * fileHandler.js — Утилиты для работы с файлами
  *
- * Provides:
- *   - readFileAsArrayBuffer(file) — read a File object into a Uint8Array
- *   - downloadFile(data, originalName, prefix) — trigger a browser download
+ * Предоставляет:
+ *   - readFileAsArrayBuffer(file) — читает File в Uint8Array
+ *   - downloadFile(data, originalName, prefix) — скачивание в браузере
  */
 
 
 /**
- * Read a File object and return its contents as a Uint8Array.
- *
- * @param {File} file — the File selected by the user
- * @returns {Promise<Uint8Array>} — resolves with the file bytes
+ * Читает File и возвращает содержимое как Uint8Array.
  */
 export function readFileAsArrayBuffer(file) {
     return new Promise((resolve, reject) => {
@@ -31,16 +28,11 @@ export function readFileAsArrayBuffer(file) {
 
 
 /**
- * Trigger a browser download of arbitrary binary data.
+ * Скачивает бинарные данные в браузере.
  *
- * Naming convention:
- *   originalName = "photo.png"
- *   prefix       = "encrypted"   → "encrypted_photo.png"
- *   prefix       = "decrypted"   → "decrypted_photo.png"
- *
- * @param {Uint8Array|Blob|string} data — payload to download
- * @param {string} originalName — original file name (used to build output name)
- * @param {string} prefix — prefix to prepend ("encrypted" / "decrypted")
+ * Примеры имен:
+ *   "photo.png" + "encrypted" → "encrypted_photo.png"
+ *   "photo.png" + "decrypted" → "decrypted_photo.png"
  */
 export function downloadFile(data, originalName, prefix) {
     const fileName = prefix ? `${prefix}_${originalName}` : originalName;
